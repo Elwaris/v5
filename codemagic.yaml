@@ -1,0 +1,124 @@
+# ─────────────────────────────────────────────────────────────────
+# codemagic.yaml  —  ICT Trade Journal
+# This file must sit in the ROOT of your GitHub repo
+# ─────────────────────────────────────────────────────────────────
+
+workflows:
+
+  android-debug:
+    name: Android Debug APK
+    max_build_duration: 30
+    instance_type: linux_x2
+
+    environment:
+      flutter: stable
+      java: 17
+
+    scripts:
+      - name: Print working directory (debug)
+        script: |
+          echo "Current dir: $(pwd)"
+          echo "Files here:"
+          ls -la
+          echo "Looking for pubspec.yaml:"
+          find . -name "pubspec.yaml" 2>/dev/null
+
+      - name: Move into project folder if needed
+        script: |
+          # If pubspec.yaml is NOT in the current directory,
+          # find it and cd into its parent
+          if [ ! -f "pubspec.yaml" ]; then
+            PUBSPEC=$(find . -name "pubspec.yaml" -not -path "*/.*" | head -1)
+            if [ -n "$PUBSPEC" ]; then
+              PROJECT_DIR=$(dirname "$PUBSPEC")
+              echo "Found pubspec.yaml in: $PROJECT_DIR"
+              cd "$PROJECT_DIR"
+              echo "Changed to: $(pwd)"
+            else
+              echo "ERROR: pubspec.yaml not found anywhere!"
+              exit 1
+            fi
+          else
+            echo "pubspec.yaml found in current directory — good."
+          fi
+
+      - name: Get Flutter packages
+        script: flutter pub get
+
+      - name: Analyse code
+        script: flutter analyze --no-fatal-infos
+
+      - name: Build debug APK
+        script: |
+          flutter build apk \
+            --debug \
+            --split-per-abi
+
+    artifacts:
+      - build/app/outputs/flutter-apk/*.apk
+      - "**/build/app/outputs/flutter-apk/*.apk"
+
+    publishing:
+      email:
+        recipients:
+          - YOUR_EMAIL@gmail.com    # ← replace with your real email
+        notify:
+          success: true
+          failure: true
+
+
+  android-release:
+    name: Android Release APK
+    max_build_duration: 45
+    instance_type: linux_x2
+
+    environment:
+      flutter: stable
+      java: 17
+      android_signing:
+        - ict_journal_keystore
+
+    scripts:
+      - name: Print working directory (debug)
+        script: |
+          echo "Current dir: $(pwd)"
+          ls -la
+          find . -name "pubspec.yaml" 2>/dev/null
+
+      - name: Move into project folder if needed
+        script: |
+          if [ ! -f "pubspec.yaml" ]; then
+            PUBSPEC=$(find . -name "pubspec.yaml" -not -path "*/.*" | head -1)
+            if [ -n "$PUBSPEC" ]; then
+              PROJECT_DIR=$(dirname "$PUBSPEC")
+              cd "$PROJECT_DIR"
+            else
+              echo "ERROR: pubspec.yaml not found!"
+              exit 1
+            fi
+          fi
+
+      - name: Get Flutter packages
+        script: flutter pub get
+
+      - name: Analyse code
+        script: flutter analyze --no-fatal-infos
+
+      - name: Build release APK
+        script: |
+          flutter build apk \
+            --release \
+            --split-per-abi \
+            --build-number=$(($(date +%s)))
+
+    artifacts:
+      - build/app/outputs/flutter-apk/*.apk
+      - "**/build/app/outputs/flutter-apk/*.apk"
+
+    publishing:
+      email:
+        recipients:
+          - YOUR_EMAIL@gmail.com    # ← replace with your real email
+        notify:
+          success: true
+          failure: true
